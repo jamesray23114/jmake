@@ -24,4 +24,6 @@ clean:
 	rm -f .temp/find.o
 	rm -f .temp/run.o
 	rm -f .temp/jmake
+	rm -f .temp/test
+	rm -f .temp/test.o
 

@@ -68,18 +68,26 @@ static char* next(char** buf) {
     char* curtok = *buf;
     
     if (*curtok == '\0') {
-        return NULL;
+        return EOP;
+    }
+
+    if (*curtok == '\n') {
+
+        *buf = curtok + 1;
+        for(; isspace(**buf); (*buf)++); // skip whitespace
+
+        return EOL;
     }
 
     if (*curtok == '#') { // skip comments
         for(; *curtok != '\n'; curtok++) 
             if (*curtok == '\0') 
-                return NULL;
+                return EOL; // EOP will be caught by the next call to next
         
         *buf = curtok;
         for(; isspace(**buf); (*buf)++); // skip whitespace
 
-        return next(buf);
+        return EOL;
     }
 
     if (!isalnum(*curtok)) { 
@@ -101,7 +109,7 @@ end: ;
     curtok[size] = '\0';
 
     *buf += size;
-    for(; isspace(**buf); (*buf)++); // skip whitespace
+    for(; isspace(**buf) && **buf != '\n'; (*buf)++); // skip whitespace, but not newlines
 
     return curtok;
 }
@@ -137,10 +145,9 @@ Unit* parse_file(char* filename, char* path) {
     fclose(file);
     buffer[fsize] = '\0';
 
-
     // parse the buffer into tokens
     char* token;
-    while(token = next(&buffer)) {
+    while((token = next(&buffer)) != EOP) { // 
         if (unit->count - 1 == size) {
             size *= 2;
             unit->content = realloc(unit->content, sizeof(char*) * size);

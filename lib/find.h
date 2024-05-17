@@ -15,3 +15,5 @@ typedef struct {
 FileArray*  get_files(char* path);
 Unit*       parse_file(char* file, char* path);
 
+#define EOP (char*) NULL
+#define EOL (char*) 1
