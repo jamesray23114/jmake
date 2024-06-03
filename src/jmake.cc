@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
 
     FileArray files = *get_files(".temp/");
     
-    for (int i = 0; i < files.count; i++) {
+    for (uint i = 0; i < files.count; i++) {
         Unit u = *parse_file(files.files[i], ".temp/");
 
         script_exec(u);

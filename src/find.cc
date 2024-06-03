@@ -2,21 +2,21 @@
 #include <find.h>
 #include <parse.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cctype>
 
 #include <dirent.h>
 
 // find all files ending with .jmake or named jmakefile in the given path 
-FileArray* get_files(char* path) {
+FileArray* get_files(const char* path) {
     
-    FileArray* files = malloc(sizeof(FileArray)); 
+    FileArray* t_files = new FileArray(); 
 
-    files->count = 0;
-    files->files = malloc(sizeof(char*) * 4); // reserve 4 files, realloc if needed
-    int size = 4;
+    t_files->count = 0;
+    t_files->files = (char**) malloc(sizeof(char*) * 4); // reserve 4 files, realloc if needed
+    uint size = 4;
 
     // open the directory
     DIR* dir = opendir(path);
@@ -26,19 +26,19 @@ FileArray* get_files(char* path) {
     }
 
     // read the names of all files in the directory
-    struct dirent* entry;
+    dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
 
         if(entry->d_type == DT_REG) { // check if the entry is a regular file
             if (strcmp(entry->d_name, "jmakefile") == 0) { // check if the file is named jmakefile
 
-                if (files->count - 1 == size) { // realloc
+                if (t_files->count - 1u == size) { // realloc
                     size *= 2;
-                    files->files = realloc(files->files, sizeof(char*) * size);
+                    t_files->files = (char**) realloc(t_files->files, sizeof(char*) * size);
                 }
 
-                files->files[files->count] = entry->d_name;
-                files->count++;
+                t_files->files[t_files->count] = entry->d_name;
+                t_files->count++;
             }
 
             char* ext = entry->d_name;
@@ -48,20 +48,20 @@ FileArray* get_files(char* path) {
             while((ext = strrchr(ext, '.')) != NULL) { 
                 ext++; // skip the dot
                 
-                if (files->count - 1 == size) { // realloc
+                if (t_files->count - 1u == size) { // realloc
                     size *= 2;
-                    files->files = realloc(files->files, sizeof(char*) * size);
+                    t_files->files = (char**) realloc(t_files->files, sizeof(char*) * size);
                 }
 
                 if (strcmp(ext, "jmake") == 0) { // check if the file ends with .jmake
-                    files->files[files->count] = entry->d_name;
-                    files->count++;
+                    t_files->files[t_files->count] = entry->d_name;
+                    t_files->count++;
                 }
             }
         }
     }
 
-    return files;
+    return t_files;
 }
 
 static char* next(char** buf) {
@@ -104,7 +104,7 @@ static char* next(char** buf) {
 end: ;
     // copy the token into a new buffer
     int size = curtok - *buf;    
-    curtok = malloc(size + 1);
+    curtok = (char*) malloc(size + 1);
     strncpy(curtok, *buf, size);
     curtok[size] = '\0';
 
@@ -114,19 +114,21 @@ end: ;
     return curtok;
 }
 
-Unit* parse_file(char* filename, char* path) {
+Unit* parse_file(const char* filename, const char* path) {
     
-    char* infile = malloc(strlen(path) + strlen(filename) + 1);
+    char* infile = (char*) malloc(strlen(path) + strlen(filename) + 1);
     infile = strcat(infile, path);
     infile = strcat(infile, filename);
     infile[strlen(path) + strlen(filename)] = '\0';
 
-    Unit* unit = malloc(sizeof(Unit));
-    unit->filename = filename;
-    unit->path = path;
-    unit->count = 0;
-    unit->content = malloc(sizeof(char*) * 32); // reserve 32 tokens, realloc if needed
-    int size = 32;
+    Unit* unit = new Unit(
+        filename,
+        path,
+        0, // count
+        (char**) malloc(sizeof(char*) * 32) // buffer
+                                            // reserve 32 tokens, realloc if needed
+    );
+    uint size = 32;
 
     FILE* file = fopen(infile, "r"); // open file for reading
     if (file == NULL) {
@@ -140,7 +142,7 @@ Unit* parse_file(char* filename, char* path) {
     fseek(file, 0, SEEK_SET);
 
     // read the file into a buffer
-    char* buffer = malloc(fsize + 1);
+    char* buffer = (char*) malloc(fsize + 1);
     fread(buffer, 1, fsize, file);
     fclose(file);
     buffer[fsize] = '\0';
@@ -148,9 +150,9 @@ Unit* parse_file(char* filename, char* path) {
     // parse the buffer into tokens
     char* token;
     while((token = next(&buffer)) != EOP) { // 
-        if (unit->count - 1 == size) {
+        if (unit->count - 1u == size) {
             size *= 2;
-            unit->content = realloc(unit->content, sizeof(char*) * size);
+            unit->content = (char**) realloc(unit->content, sizeof(char*) * size);
         }
 
         unit->content[unit->count] = token;
