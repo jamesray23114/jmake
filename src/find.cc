@@ -1,16 +1,42 @@
+/*********************************************************************
+ * This file: (find.cc) 
+ *  - Is apart of the jmake project, which can be found here: https://github.com/jamesray23114/jmake.
+ *  - Is licensed under the MIT License, a copy of which can be found in the LICENSE file.
+ *  - Was created on May 11 2024. 
+ * It:
+ *  - Impliments the functions declared in find.h.
+**********************************************************************/
+
+// == project includes ==
 #include <typedef.h>
 #include <find.h>
 #include <parse.h>
 
+// == standard includes ==
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
 
+// == system includes ==
 #include <dirent.h>
 
-// find all files ending with .jmake or named jmakefile in the given path 
-FileArray* get_files(const char* path) {
+// =============================
+// ======== definitions ========
+// =============================
+
+// function next
+// - get the next token from the passed buffer
+static char* next(char** buf);
+
+// variable tokenended
+// - flag to check if the token has ended, used in function next
+static bool tokenended = false;
+
+// =============================
+// ====== implementations ======
+// =============================
+FileArray* get_files(const char* path) { // find all files ending with .jmake or named jmakefile in the given path 
     
     FileArray* t_files = new FileArray(); 
 
@@ -67,10 +93,23 @@ FileArray* get_files(const char* path) {
 static char* next(char** buf) {
     char* curtok = *buf;
     
+    // return End Of Token if we are at the end of the token
+    if(tokenended) {
+        tokenended = false;
+    
+        // determine if we are at the end of the token via whitespace
+        if(isspace(*curtok) || *curtok == '\0') { // apperently the null character is not considered whitespace
+            for(; isspace(**buf) && **buf != '\n'; (*buf)++); // skip whitespace, but not newlines as they will be handled by the next call to next
+            return EOT;
+        }
+    }
+
+    // return End Of Program if we are at the end of the buffer
     if (*curtok == '\0') {
         return EOP;
     }
 
+    // return End Of Line if we are at the end of the line
     if (*curtok == '\n') {
 
         *buf = curtok + 1;
@@ -90,12 +129,18 @@ static char* next(char** buf) {
         return EOL;
     }
 
+    // only return a single character if the current character is not alphanumeric
     if (!isalnum(*curtok)) { 
+        tokenended = true;
+
         curtok++;
         goto end;
     }
 
+
     for(; !isspace(*curtok); curtok++) { // find the end of the token      
+        tokenended = true;
+        
         if (!isalnum(*curtok)) { 
             break;
         }
@@ -103,18 +148,20 @@ static char* next(char** buf) {
 
 end: ;
     // copy the token into a new buffer
+
     int size = curtok - *buf;    
+
     curtok = (char*) malloc(size + 1);
     strncpy(curtok, *buf, size);
     curtok[size] = '\0';
 
     *buf += size;
-    for(; isspace(**buf) && **buf != '\n'; (*buf)++); // skip whitespace, but not newlines
-
+    //for(; isspace(**buf) && **buf != '\n'; (*buf)++); // skip whitespace, but not newlines
+    
     return curtok;
 }
 
-Unit* parse_file(const char* filename, const char* path) {
+Unit* lex_file(const char* filename, const char* path) {
     
     char* infile = (char*) malloc(strlen(path) + strlen(filename) + 1);
     infile = strcat(infile, path);
@@ -149,7 +196,7 @@ Unit* parse_file(const char* filename, const char* path) {
 
     // parse the buffer into tokens
     char* token;
-    while((token = next(&buffer)) != EOP) { // 
+    while((token = next(&buffer)) != EOP) { 
         if (unit->count - 1u == size) {
             size *= 2;
             unit->content = (char**) realloc(unit->content, sizeof(char*) * size);
@@ -158,6 +205,19 @@ Unit* parse_file(const char* filename, const char* path) {
         unit->content[unit->count] = token;
         unit->count++;
     }
+
+    if (unit->count - 1u == size) { // we have to recheck the size because the last token may have been added
+        size *= 2;
+        unit->content = (char**) realloc(unit->content, sizeof(char*) * size);
+    }
+
+    if (unit->content[unit->count - 1] != EOL) { // add an EOL token to the end of the file if there is not one
+        unit->content[unit->count] = EOL;
+        unit->count++;
+    }
+
+    unit->content[unit->count] = EOP; // add an EOP token to the end of the file
+    unit->count++;
 
     return unit;
 }
